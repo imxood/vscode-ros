@@ -3,49 +3,45 @@ import * as utils from "./utils";
 import { basename } from "path";
 import * as vscode from "vscode";
 
+import { WorkspaceFolder, DebugConfiguration, ProviderResult, CancellationToken } from 'vscode';
+
 /**
  * Gets stringified settings to pass to the debug server.
  */
 export async function getDebugSettings() {
-  return JSON.stringify({ env: extension.env });
+    return JSON.stringify({ env: extension.env });
 }
 
 /**
  * Interacts with the user to create initial configurations.
  */
-export async function provideInitialConfigurations() {
-  const packages = utils.getPackages();
+export async function provideInitialConfigurations(config: DebugConfiguration) {
+    const packages = utils.getPackages();
 
-  const command = await vscode.window.showQuickPick(["roslaunch", "rosrun"], { placeHolder: "Launch command" });
-  const packageName = await vscode.window.showQuickPick(packages.then(Object.keys), { placeHolder: "Package" });
+    const command = await vscode.window.showQuickPick(["roslaunch", "rosrun"], { placeHolder: "Launch command" });
+    const packageName = await vscode.window.showQuickPick(packages.then(Object.keys), { placeHolder: "Package" });
 
-  let target: string;
+    let target: string;
 
-  if (packageName) {
-    let basenames = (files: string[]) => files.map(file => basename(file));
+    if (packageName) {
+        let basenames = (files: string[]) => files.map(file => basename(file));
 
-    if (command === "roslaunch") {
-      const launches = utils.findPackageLaunchFiles(packageName).then(basenames);
-      target = await vscode.window.showQuickPick(launches, { placeHolder: "Launch file" });
+        if (command === "roslaunch") {
+            const launches = utils.findPackageLaunchFiles(packageName).then(basenames);
+            target = await vscode.window.showQuickPick(launches, { placeHolder: "Launch file" });
+        } else {
+            const executables = utils.findPackageExecutables(packageName).then(basenames);
+            target = await vscode.window.showQuickPick(executables, { placeHolder: "Executable" });
+        }
     } else {
-      const executables = utils.findPackageExecutables(packageName).then(basenames);
-      target = await vscode.window.showQuickPick(executables, { placeHolder: "Executable" });
+        target = await vscode.window.showInputBox({ placeHolder: "Target" });
     }
-  } else {
-    target = await vscode.window.showInputBox({ placeHolder: "Target" });
-  }
 
-  return JSON.stringify({
-    configurations: [
-      {
-        command,
-        debugSettings: "${command:debugSettings}",
-        name: target,
-        package: packageName,
-        type: "ros",
-        target,
-      },
-    ],
-    version: "0.1.0",
-  }, undefined, 2);
+    config.name = target;
+    config.type = "ros";
+    config.debugSettings = "${command:debugSettings}";
+    config.package = packageName;
+    config.target = target;
+    config.command = command;
+
 }

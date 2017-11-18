@@ -142,8 +142,7 @@
               "debugSettings": "${command:debugSettings}"
             }
           }
-        ],
-        "initialConfigurations": "ros.provideInitialConfigurations"
+        ]
       }
     ],
     "languages": [
