@@ -3,12 +3,12 @@
   "displayName": "ROS",
   "icon": "assets/icon.png",
   "description": "Development support for Robot Operating System (ROS)",
-  "version": "0.2.0",
-  "publisher": "ajshort",
+  "version": "0.3.1",
+  "publisher": "maxu",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ajshort/vscode-ros.git"
+    "url": "https://github.com/imxood/vscode-ros.git"
   },
   "engines": {
     "vscode": "^1.18.0"
