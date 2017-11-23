@@ -71,7 +71,32 @@ export async function updateCppProperties(): Promise<void> {
 /**
  * Updates the python autocomplete path to support ROS.
  */
-export function updatePythonPath() {
-    vscode.workspace.getConfiguration().update(PYTHON_AUTOCOMPLETE_PATHS, extension.env.PYTHONPATH.split(":"));
+export async function updatePythonPath() {
+
+    const pathon_paths: string[] = [];
+
+    // Get all packages within the workspace, and check if they have an include
+    // directory. If so, add them to the list.
+    const packages = await utils.getPackages().then(
+        pkgs => _.values(pkgs) //.filter(pkg => pkg.startsWith(extension.baseDir))
+    );
+
+    await Promise.all(packages.map(pkg => {
+        const pkg_name = pkg.substring(pkg.lastIndexOf("/")+1);
+        const pkg_path = path.join(pkg, "src", pkg_name);
+
+        console.log( "pkg_path: ", pkg_path );
+
+        return pfs.exists( path.join(pkg_path, "__init__.py")).then(exists => {
+            if (exists) {
+                pathon_paths.push(pkg_path);
+            }
+        });
+    }));
+
+    pathon_paths.push.apply(pathon_paths, process.env.PYTHONPATH.split(":"));
+
+    vscode.workspace.getConfiguration().update(PYTHON_AUTOCOMPLETE_PATHS, pathon_paths);
+    
     console.log( "python path: ", vscode.workspace.getConfiguration().get(PYTHON_AUTOCOMPLETE_PATHS) );
 }
