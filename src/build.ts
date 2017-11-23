@@ -85,8 +85,6 @@ export async function updatePythonPath() {
         const pkg_name = pkg.substring(pkg.lastIndexOf("/")+1);
         const pkg_path = path.join(pkg, "src");
 
-        console.log( "pkg_path: ", pkg_path );
-
         return pfs.exists( path.join(pkg_path, pkg_name, "__init__.py")).then(exists => {
             if (exists) {
                 pathon_paths.push(pkg_path);
@@ -97,6 +95,8 @@ export async function updatePythonPath() {
     pathon_paths.push.apply(pathon_paths, process.env.PYTHONPATH.split(":"));
 
     vscode.workspace.getConfiguration().update(PYTHON_AUTOCOMPLETE_PATHS, pathon_paths);
+
+    await pfs.writeFile(vscode.workspace.rootPath + "/.env", "PYTHONPATH=" + pathon_paths.join(":"));
     
     console.log( "python path: ", vscode.workspace.getConfiguration().get(PYTHON_AUTOCOMPLETE_PATHS) );
 }
