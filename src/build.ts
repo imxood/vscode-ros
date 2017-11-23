@@ -83,11 +83,11 @@ export async function updatePythonPath() {
 
     await Promise.all(packages.map(pkg => {
         const pkg_name = pkg.substring(pkg.lastIndexOf("/")+1);
-        const pkg_path = path.join(pkg, "src", pkg_name);
+        const pkg_path = path.join(pkg, "src");
 
         console.log( "pkg_path: ", pkg_path );
 
-        return pfs.exists( path.join(pkg_path, "__init__.py")).then(exists => {
+        return pfs.exists( path.join(pkg_path, pkg_name, "__init__.py")).then(exists => {
             if (exists) {
                 pathon_paths.push(pkg_path);
             }
