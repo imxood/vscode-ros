@@ -43,49 +43,46 @@ export async function activate(context: vscode.ExtensionContext) {
   // Activate if we're in a catkin workspace.
   await determineBuildSystem(vscode.workspace.rootPath);
 
-    if (buildSystem == BuildSystem.None) {
-        return;
-    }
+  if (buildSystem == BuildSystem.None) {
+    return;
+  }
 
-    console.log(`Activating ROS extension in "${baseDir}"`);
+  console.log(`Activating ROS extension in "${baseDir}"`);
 
   // Activate components when the ROS env is changed.
   context.subscriptions.push(onDidChangeEnv(activateEnvironment.bind(null, context)));
 
-    // Activate components when the ROS env is changed.
-    context.subscriptions.push(onDidChangeEnv(activateEnvironment));
+  // Activate components which don't require the ROS env.
+  context.subscriptions.push(vscode.languages.registerDocumentFormattingEditProvider(
+    "cpp", new CppFormatter()
+  ));
 
-    // Activate components which don't require the ROS env.
-    context.subscriptions.push(vscode.languages.registerDocumentFormattingEditProvider(
-        "cpp", new CppFormatter()
-    ));
+  // Source the environment, and re-source on config change.
+  let config = utils.getConfig();
 
-    // Source the environment, and re-source on config change.
-    let config = utils.getConfig();
+  context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(() => {
+    const updatedConfig = utils.getConfig();
+    const fields = Object.keys(config).filter(k => !(config[k] instanceof Function));
+    const changed = fields.some(key => updatedConfig[key] !== config[key]);
 
-    context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(() => {
-        const updatedConfig = utils.getConfig();
-        const fields = Object.keys(config).filter(k => !(config[k] instanceof Function));
-        const changed = fields.some(key => updatedConfig[key] !== config[key]);
+    if (changed) {
+      sourceRosAndWorkspace();
+    }
 
-        if (changed) {
-            sourceRosAndWorkspace();
-        }
+    config = updatedConfig;
+  }));
 
-        config = updatedConfig;
-    }));
+  sourceRosAndWorkspace();
 
-    sourceRosAndWorkspace();
-
-    return {
-        getBaseDir: () => baseDir,
-        getEnv: () => env,
-        onDidChangeEnv: (listener: () => any, thisArg: any) => onDidChangeEnv(listener, thisArg),
-    };
+  return {
+    getBaseDir: () => baseDir,
+    getEnv: () => env,
+    onDidChangeEnv: (listener: () => any, thisArg: any) => onDidChangeEnv(listener, thisArg),
+  };
 }
 
 export function deactivate() {
-    subscriptions.forEach(disposable => disposable.dispose());
+  subscriptions.forEach(disposable => disposable.dispose());
 }
 
 /**
@@ -93,23 +90,23 @@ export function deactivate() {
  * auto-generated files.
  */
 async function determineBuildSystem(dir: string): Promise<void> {
-    while (dir && dirname(dir) !== dir) {
-        if (await pfs.exists(`${dir}/.catkin_workspace`)) {
-            baseDir = dir;
-            buildSystem = BuildSystem.CatkinMake;
+  while (dir && dirname(dir) !== dir) {
+    if (await pfs.exists(`${dir}/.catkin_workspace`)) {
+      baseDir = dir;
+      buildSystem = BuildSystem.CatkinMake;
 
-            return;
-        } else if (await pfs.exists(`${dir}/.catkin_tools`)) {
-            baseDir = dir;
-            buildSystem = BuildSystem.CatkinTools;
+      return;
+    } else if (await pfs.exists(`${dir}/.catkin_tools`)) {
+      baseDir = dir;
+      buildSystem = BuildSystem.CatkinTools;
 
-            return;
-        }
-
-        dir = dirname(dir);
+      return;
     }
 
-    buildSystem = BuildSystem.None;
+    dir = dirname(dir);
+  }
+
+  buildSystem = BuildSystem.None;
 }
 
 /**
@@ -157,55 +154,39 @@ function activateEnvironment(context: vscode.ExtensionContext) {
  * Loads the ROS environment, and prompts the user to select a distro if required.
  */
 async function sourceRosAndWorkspace(): Promise<void> {
-    env = undefined;
+  env = undefined;
 
-    const config = utils.getConfig();
-    const distro = config.get("distro", "");
+  const config = utils.getConfig();
+  const distro = config.get("distro", "");
 
-    if (distro) {
-        try {
-            env = await utils.sourceSetupFile(`/opt/ros/${distro}/setup.bash`, {});
-        } catch (err) {
-            vscode.window.showErrorMessage(`Could not source the setup file for ROS distro "${distro}".`);
-        }
-    } else if (typeof process.env.ROS_ROOT !== "undefined") {
-        env = process.env;
-    } else {
-        const message = "The ROS distro is not configured.";
-        const configure = "Configure";
-
-        if (await vscode.window.showErrorMessage(message, configure) === configure) {
-            config.update("distro", await vscode.window.showQuickPick(utils.getDistros()));
-        }
+  if (distro) {
+    try {
+      env = await utils.sourceSetupFile(`/opt/ros/${distro}/setup.bash`, {});
+    } catch (err) {
+      vscode.window.showErrorMessage(`Could not source the setup file for ROS distro "${distro}".`);
     }
+  } else if (typeof process.env.ROS_ROOT !== "undefined") {
+    env = process.env;
+  } else {
+    const message = "The ROS distro is not configured.";
+    const configure = "Configure";
 
-    // Source the workspace setup over the top.
-    const workspaceSetup = `${baseDir}/devel/setup.bash`;
-
-    if (env && typeof env.ROS_ROOT !== "undefined" && await pfs.exists(workspaceSetup)) {
-        try {
-            env = await utils.sourceSetupFile(workspaceSetup, env);
-        } catch (err) {
-            vscode.window.showWarningMessage("Could not source the workspace setup file.");
-        }
+    if (await vscode.window.showErrorMessage(message, configure) === configure) {
+      config.update("distro", await vscode.window.showQuickPick(utils.getDistros()));
     }
+  }
 
-    // Notify listeners the environment has changed.
-    onEnvChanged.fire();
-}
+  // Source the workspace setup over the top.
+  const workspaceSetup = `${baseDir}/devel/setup.bash`;
 
-class RosConfigurationProvider implements vscode.DebugConfigurationProvider {
-
-    /**
-     * Massage a debug configuration just before a debug session is being launched,
-     * e.g. add all missing attributes to the debug configuration.
-     */
-    resolveDebugConfiguration(folder: WorkspaceFolder | undefined, config: DebugConfiguration, token?: CancellationToken): ProviderResult<DebugConfiguration> {
-
-        debug.provideInitialConfigurations(config);
-
-        return config;
-
+  if (env && typeof env.ROS_ROOT !== "undefined" && await pfs.exists(workspaceSetup)) {
+    try {
+      env = await utils.sourceSetupFile(workspaceSetup, env);
+    } catch (err) {
+      vscode.window.showWarningMessage("Could not source the workspace setup file.");
     }
+  }
 
+  // Notify listeners the environment has changed.
+  onEnvChanged.fire();
 }

@@ -10,19 +10,16 @@ import {
   WorkspaceFolder,
 } from "vscode";
 
-import { WorkspaceFolder, DebugConfiguration, ProviderResult, CancellationToken } from 'vscode';
-
 /**
  * Gets stringified settings to pass to the debug server.
  */
 export async function getDebugSettings() {
-    return JSON.stringify({ env: extension.env });
+  return JSON.stringify({ env: extension.env });
 }
 
 /**
  * Interacts with the user to create a `roslaunch` or `rosrun` configuration.
  */
-
 export class RosDebugConfigProvider implements DebugConfigurationProvider {
   provideDebugConfigurations(folder: WorkspaceFolder | undefined, token?: CancellationToken) {
     return [];
@@ -34,11 +31,9 @@ export class RosDebugConfigProvider implements DebugConfigurationProvider {
     const command = await window.showQuickPick(["roslaunch", "rosrun"], {  placeHolder: "Launch command" });
     const packageName = await window.showQuickPick(packages.then(Object.keys), { placeHolder: "Package" });
 
-
     let target: string;
 
     if (packageName) {
-
       let basenames = (files: string[]) => files.map(file => basename(file));
 
       if (command === "roslaunch") {
@@ -62,5 +57,4 @@ export class RosDebugConfigProvider implements DebugConfigurationProvider {
 
     return config;
   }
-
 }
