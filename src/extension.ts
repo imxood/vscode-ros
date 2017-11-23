@@ -10,10 +10,6 @@ import * as utils from "./utils";
 import { dirname } from "path";
 import * as vscode from "vscode";
 
-import { WorkspaceFolder, DebugConfiguration, ProviderResult, CancellationToken } from 'vscode';
-
-let context: vscode.ExtensionContext;
-
 /**
  * The catkin workspace base dir.
  */
@@ -43,11 +39,9 @@ export let onDidChangeEnv = onEnvChanged.event;
  */
 let subscriptions = <vscode.Disposable[]>[];
 
-export async function activate(ctx: vscode.ExtensionContext) {
-    // Activate if we're in a catkin workspace.
-    context = ctx;
-
-    await determineBuildSystem(vscode.workspace.rootPath);
+export async function activate(context: vscode.ExtensionContext) {
+  // Activate if we're in a catkin workspace.
+  await determineBuildSystem(vscode.workspace.rootPath);
 
     if (buildSystem == BuildSystem.None) {
         return;
@@ -55,8 +49,8 @@ export async function activate(ctx: vscode.ExtensionContext) {
 
     console.log(`Activating ROS extension in "${baseDir}"`);
 
-    // register a configuration provider
-    context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('ros', new RosConfigurationProvider()));
+  // Activate components when the ROS env is changed.
+  context.subscriptions.push(onDidChangeEnv(activateEnvironment.bind(null, context)));
 
     // Activate components when the ROS env is changed.
     context.subscriptions.push(onDidChangeEnv(activateEnvironment));
@@ -121,42 +115,42 @@ async function determineBuildSystem(dir: string): Promise<void> {
 /**
  * Activates components which require a ROS env.
  */
-function activateEnvironment() {
-    // Clear existing disposables.
-    while (subscriptions.length > 0) {
-        subscriptions.pop().dispose();
-    }
+function activateEnvironment(context: vscode.ExtensionContext) {
+  // Clear existing disposables.
+  while (subscriptions.length > 0) {
+    subscriptions.pop().dispose();
+  }
 
-    if (typeof env.ROS_ROOT === "undefined") {
-        return;
-    }
+  if (typeof env.ROS_ROOT === "undefined") {
+    return;
+  }
 
-    // Set up the master.
-    const masterApi = new master.XmlRpcApi(env.ROS_MASTER_URI);
-    const masterStatusItem = new master.StatusBarItem(masterApi);
-    const masterStatusProvider = new master.StatusDocumentProvider(context, masterApi);
+  // Set up the master.
+  const masterApi = new master.XmlRpcApi(env.ROS_MASTER_URI);
+  const masterStatusItem = new master.StatusBarItem(masterApi);
+  const masterStatusProvider = new master.StatusDocumentProvider(context, masterApi);
 
-    masterStatusItem.activate();
+  masterStatusItem.activate();
 
-    subscriptions.push(masterStatusItem);
-    subscriptions.push(vscode.workspace.registerTextDocumentContentProvider("ros-master", masterStatusProvider));
-    subscriptions.push(vscode.workspace.registerTaskProvider("catkin", new CatkinTaskProvider()));
+  subscriptions.push(masterStatusItem);
+  subscriptions.push(vscode.workspace.registerTextDocumentContentProvider("ros-master", masterStatusProvider));
+  subscriptions.push(vscode.workspace.registerTaskProvider("catkin", new CatkinTaskProvider()));
+  subscriptions.push(vscode.debug.registerDebugConfigurationProvider("ros", new debug.RosDebugConfigProvider()));
 
-    // Register commands.
-    subscriptions.push(
-        vscode.commands.registerCommand(constants.CMD_CREATE_CATKIN_PACKAGE, catkin.createPackage),
-        vscode.commands.registerCommand(constants.CMD_CREATE_TERMINAL, utils.createTerminal),
-        vscode.commands.registerCommand(constants.CMD_GET_DEBUG_SETTINGS, debug.getDebugSettings),
-        //vscode.commands.registerCommand(constants.CMD_PROVIDE_INITIAL_CONFIGURATIONS, debug.provideInitialConfigurations),
-        vscode.commands.registerCommand(constants.CMD_SHOW_MASTER_STATUS, master.showMasterStatus),
-        vscode.commands.registerCommand(constants.CMD_START_CORE, master.startCore),
-        vscode.commands.registerCommand(constants.CMD_STOP_CORE, () => master.stopCore(masterApi)),
-        vscode.commands.registerCommand(constants.CMD_UPDATE_CPP_PROPERTIES, build.updateCppProperties),
-        vscode.commands.registerCommand(constants.CMD_UPDATE_PYTHON_PATH, build.updatePythonPath),
-    );
+  // Register commands.
+  subscriptions.push(
+    vscode.commands.registerCommand(constants.CMD_CREATE_CATKIN_PACKAGE, catkin.createPackage),
+    vscode.commands.registerCommand(constants.CMD_CREATE_TERMINAL, utils.createTerminal),
+    vscode.commands.registerCommand(constants.CMD_GET_DEBUG_SETTINGS, debug.getDebugSettings),
+    vscode.commands.registerCommand(constants.CMD_SHOW_MASTER_STATUS, master.showMasterStatus),
+    vscode.commands.registerCommand(constants.CMD_START_CORE, master.startCore),
+    vscode.commands.registerCommand(constants.CMD_STOP_CORE, () => master.stopCore(masterApi)),
+    vscode.commands.registerCommand(constants.CMD_UPDATE_CPP_PROPERTIES, build.updateCppProperties),
+    vscode.commands.registerCommand(constants.CMD_UPDATE_PYTHON_PATH, build.updatePythonPath),
+  );
 
-    // Generate config files if they don't already exist.
-    build.createConfigFiles();
+  // Generate config files if they don't already exist.
+  build.createConfigFiles();
 }
 
 /**
