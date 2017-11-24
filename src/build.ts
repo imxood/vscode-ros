@@ -92,11 +92,9 @@ export async function updatePythonPath() {
         });
     }));
 
+    await pfs.writeFile(vscode.workspace.rootPath + "/.env", "PYTHONPATH=" + pathon_paths.join(":"));
+
     pathon_paths.push.apply(pathon_paths, process.env.PYTHONPATH.split(":"));
 
     vscode.workspace.getConfiguration().update(PYTHON_AUTOCOMPLETE_PATHS, pathon_paths);
-
-    await pfs.writeFile(vscode.workspace.rootPath + "/.env", "PYTHONPATH=" + pathon_paths.join(":"));
-    
-    console.log( "python path: ", vscode.workspace.getConfiguration().get(PYTHON_AUTOCOMPLETE_PATHS) );
 }
