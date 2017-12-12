@@ -13,7 +13,7 @@ export default class CatkinTaskProvider implements vscode.TaskProvider {
       buildCommand = `catkin_make --directory "${extension.baseDir}"`;
       testCommand = `${buildCommand} run_tests`;
     } else if (extension.buildSystem === extension.BuildSystem.CatkinTools) {
-      buildCommand = `catkin build --workspace "${extension.baseDir}"`;
+      buildCommand = `catkin build -DCMAKE_BUILD_TYPE=Debug --workspace "${extension.baseDir}"`;
       testCommand = `${buildCommand} --catkin-make-args run_tests`;
     }
 
